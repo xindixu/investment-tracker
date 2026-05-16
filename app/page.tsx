@@ -26,12 +26,27 @@ const fmtPct = (n: number) =>
     maximumFractionDigits: 2,
   }) + "%";
 
+type HoldingSortKey = "symbol" | "account" | "quantity" | "type" | "value";
+type SortDir = "asc" | "desc";
+
+const compare = (a: string | number | undefined, b: string | number | undefined) => {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return a < b ? -1 : 1;
+};
+
 export default function Page() {
   const [accounts, setAccounts] = useLocalStorage<Account[]>("accounts", []);
   const [investments, setInvestments] = useLocalStorage<Investment[]>("investments", []);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [symbolFilter, setSymbolFilter] = useState("");
+  const [accountFilter, setAccountFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<InvestmentType | "">("");
+  const [sortKey, setSortKey] = useState<HoldingSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const symbols = useMemo(
     () => Array.from(new Set(investments.map((i) => i.symbol.toUpperCase()))),
@@ -89,6 +104,51 @@ export default function Page() {
     () => rows.reduce((s, r) => s + (r.value ?? 0), 0),
     [rows]
   );
+
+  const filteredRows = useMemo(() => {
+    const q = symbolFilter.trim().toLowerCase();
+    let result = rows;
+    if (q) {
+      result = result.filter(({ inv }) => inv.symbol.toLowerCase().includes(q));
+    }
+    if (accountFilter) {
+      result = result.filter(({ inv }) => inv.accountId === accountFilter);
+    }
+    if (typeFilter) {
+      result = result.filter(({ inv }) => inv.type === typeFilter);
+    }
+    if (sortKey) {
+      const dir = sortDir === "asc" ? 1 : -1;
+      const keyFn = (r: (typeof rows)[number]): string | number | undefined => {
+        if (sortKey === "symbol") return r.inv.symbol;
+        if (sortKey === "account") return r.account?.name ?? "";
+        if (sortKey === "quantity") return r.inv.quantity;
+        if (sortKey === "type") return INVESTMENT_TYPE_LABELS[r.inv.type];
+        return r.value;
+      };
+      result = [...result].sort((a, b) => dir * compare(keyFn(a), keyFn(b)));
+    }
+    return result;
+  }, [rows, symbolFilter, accountFilter, typeFilter, sortKey, sortDir]);
+
+  const isFiltered = symbolFilter.trim() !== "" || accountFilter !== "" || typeFilter !== "";
+
+  const displayedTotal = useMemo(
+    () => filteredRows.reduce((s, r) => s + (r.value ?? 0), 0),
+    [filteredRows]
+  );
+
+  const toggleSort = (key: HoldingSortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortKey(null);
+      setSortDir("asc");
+    }
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<
@@ -158,6 +218,17 @@ export default function Page() {
           <button onClick={refreshPrices} disabled={loadingPrices}>
             {loadingPrices ? "Refreshing…" : "Refresh prices"}
           </button>
+          {isFiltered && (
+            <button
+              onClick={() => {
+                setSymbolFilter("");
+                setAccountFilter("");
+                setTypeFilter("");
+              }}
+            >
+              Clear filters
+            </button>
+          )}
           {priceError && <span className="error">{priceError}</span>}
         </div>
         {rows.length === 0 ? (
@@ -166,32 +237,69 @@ export default function Page() {
           <table>
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th>Account</th>
-                <th className="num">Quantity</th>
-                <th>Type</th>
-                <th className="num">Value</th>
+                <SortableTh label="Symbol" col="symbol" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>
+                  <input
+                    value={symbolFilter}
+                    onChange={(e) => setSymbolFilter(e.target.value)}
+                    placeholder="filter"
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  />
+                </SortableTh>
+                <SortableTh label="Account" col="account" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>
+                  <select
+                    value={accountFilter}
+                    onChange={(e) => setAccountFilter(e.target.value)}
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="">All</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </SortableTh>
+                <SortableTh label="Quantity" col="quantity" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} numeric />
+                <SortableTh label="Type" col="type" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as InvestmentType | "")}
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="">All</option>
+                    {INVESTMENT_TYPES.map((t) => (
+                      <option key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</option>
+                    ))}
+                  </select>
+                </SortableTh>
+                <SortableTh label="Value" col="value" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} numeric />
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ inv, account, value }) => (
-                <tr key={inv.id}>
-                  <td>{inv.symbol}</td>
-                  <td>{account ? account.name : <span className="muted">unknown</span>}</td>
-                  <td className="num">{inv.quantity}</td>
-                  <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
-                  <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
-                  <td>
-                    <button className="danger" onClick={() => removeInvestment(inv.id)}>
-                      Delete
-                    </button>
-                  </td>
+              {filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty">No matches.</td>
                 </tr>
-              ))}
+              ) : (
+                filteredRows.map(({ inv, account, value }) => (
+                  <tr key={inv.id}>
+                    <td>{inv.symbol}</td>
+                    <td>{account ? account.name : <span className="muted">unknown</span>}</td>
+                    <td className="num">{inv.quantity}</td>
+                    <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
+                    <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
+                    <td>
+                      <button className="danger" onClick={() => removeInvestment(inv.id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
               <tr>
-                <td colSpan={4} style={{ fontWeight: 600 }}>Total</td>
-                <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(totalValue)}</td>
+                <td colSpan={4} style={{ fontWeight: 600 }}>
+                  {isFiltered ? "Filtered total" : "Total"}
+                </td>
+                <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(displayedTotal)}</td>
                 <td></td>
               </tr>
             </tbody>
@@ -231,6 +339,46 @@ export default function Page() {
         )}
       </section>
     </main>
+  );
+}
+
+function SortableTh({
+  label,
+  col,
+  sortKey,
+  sortDir,
+  onClick,
+  numeric,
+  children,
+}: {
+  label: string;
+  col: HoldingSortKey;
+  sortKey: HoldingSortKey | null;
+  sortDir: SortDir;
+  onClick: (col: HoldingSortKey) => void;
+  numeric?: boolean;
+  children?: React.ReactNode;
+}) {
+  const active = sortKey === col;
+  const arrow = active ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  return (
+    <th className={numeric ? "num" : undefined} style={{ verticalAlign: "top" }}>
+      <div
+        onClick={() => onClick(col)}
+        style={{ cursor: "pointer", userSelect: "none" }}
+      >
+        {label}
+        <span style={{ color: "#888" }}>{arrow}</span>
+      </div>
+      {children && (
+        <div
+          style={{ marginTop: 4, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      )}
+    </th>
   );
 }
 
