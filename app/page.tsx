@@ -5,9 +5,11 @@ import {
   Account,
   AccountType,
   ACCOUNT_TYPES,
+  ACCOUNT_TYPE_LABELS,
   Investment,
   InvestmentType,
   INVESTMENT_TYPES,
+  INVESTMENT_TYPE_LABELS,
 } from "@/lib/types";
 
 const newId = () =>
@@ -178,7 +180,7 @@ export default function Page() {
                   <td>{inv.symbol}</td>
                   <td>{account ? account.name : <span className="muted">unknown</span>}</td>
                   <td className="num">{inv.quantity}</td>
-                  <td>{inv.type}</td>
+                  <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
                   <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
                   <td>
                     <button className="danger" onClick={() => removeInvestment(inv.id)}>
@@ -217,7 +219,7 @@ export default function Page() {
                 <tr key={g.symbol}>
                   <td>{g.symbol}</td>
                   <td className="num">{g.quantity}</td>
-                  <td>{g.type}</td>
+                  <td>{INVESTMENT_TYPE_LABELS[g.type]}</td>
                   <td className="num">{g.hasPrice ? fmtMoney(g.value) : "—"}</td>
                   <td className="num">
                     {totalValue > 0 && g.hasPrice ? fmtPct(g.value / totalValue) : "—"}
@@ -260,7 +262,7 @@ function AccountsSection({
           Type
           <select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
             {ACCOUNT_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>{ACCOUNT_TYPE_LABELS[t]}</option>
             ))}
           </select>
         </label>
@@ -289,7 +291,7 @@ function AccountsSection({
             {accounts.map((a) => (
               <tr key={a.id}>
                 <td>{a.name}</td>
-                <td>{a.type}</td>
+                <td>{ACCOUNT_TYPE_LABELS[a.type]}</td>
                 <td>
                   <button className="danger" onClick={() => onRemove(a.id)}>Delete</button>
                 </td>
@@ -360,7 +362,7 @@ function AddInvestmentSection({
             Type
             <select value={type} onChange={(e) => setType(e.target.value as InvestmentType)}>
               {INVESTMENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</option>
               ))}
             </select>
           </label>
