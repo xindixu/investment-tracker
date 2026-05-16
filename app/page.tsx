@@ -317,7 +317,10 @@ export default function Page() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleExport = () => {
-    const payload = { accounts, investments };
+    const payload = {
+      accounts,
+      investments: investments.map((i) => ({ ...i, planned: i.planned ?? false })),
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
