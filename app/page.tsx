@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/lib/storage";
 import {
   Account,
@@ -36,6 +36,39 @@ const compare = (a: string | number | undefined, b: string | number | undefined)
   if (b === undefined) return -1;
   return a < b ? -1 : 1;
 };
+
+function parseBackup(data: unknown): { accounts: Account[]; investments: Investment[] } | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as { accounts?: unknown; investments?: unknown };
+  if (!Array.isArray(d.accounts) || !Array.isArray(d.investments)) return null;
+
+  const accounts: Account[] = [];
+  for (const a of d.accounts) {
+    if (!a || typeof a !== "object") return null;
+    const x = a as Partial<Account>;
+    if (typeof x.id !== "string" || typeof x.name !== "string") return null;
+    if (!x.type || !ACCOUNT_TYPES.includes(x.type)) return null;
+    accounts.push({ id: x.id, name: x.name, type: x.type });
+  }
+
+  const investments: Investment[] = [];
+  for (const i of d.investments) {
+    if (!i || typeof i !== "object") return null;
+    const x = i as Partial<Investment>;
+    if (typeof x.id !== "string" || typeof x.symbol !== "string") return null;
+    if (typeof x.accountId !== "string" || typeof x.quantity !== "number") return null;
+    if (!x.type || !INVESTMENT_TYPES.includes(x.type)) return null;
+    investments.push({
+      id: x.id,
+      symbol: x.symbol,
+      accountId: x.accountId,
+      quantity: x.quantity,
+      type: x.type,
+    });
+  }
+
+  return { accounts, investments };
+}
 
 export default function Page() {
   const [accounts, setAccounts] = useLocalStorage<Account[]>("accounts", []);
@@ -241,10 +274,55 @@ export default function Page() {
     setInvestments(investments.filter((i) => i.id !== id));
   };
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleExport = () => {
+    const payload = { accounts, investments };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `investments-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseBackup(JSON.parse(text));
+      if (!parsed) {
+        alert("Invalid backup file: expected { accounts: [...], investments: [...] } matching the data model.");
+        return;
+      }
+      const hasData = accounts.length > 0 || investments.length > 0;
+      if (hasData && !confirm("This will replace your current accounts and investments. Continue?")) return;
+      setAccounts(parsed.accounts);
+      setInvestments(parsed.investments);
+    } catch (e) {
+      alert("Failed to import: " + (e instanceof Error ? e.message : "unknown error"));
+    }
+  };
+
   return (
     <main>
       <h1>Investment Tracker</h1>
-      <div className="muted">All data saved locally in your browser.</div>
+      <div className="toolbar">
+        <span className="muted">All data saved locally in your browser.</span>
+        <button onClick={handleExport}>Export JSON</button>
+        <button onClick={() => fileInputRef.current?.click()}>Import JSON</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleImport(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
 
       <AccountsSection accounts={accounts} onAdd={addAccount} onRemove={removeAccount} />
       <AddInvestmentSection accounts={accounts} onAdd={addInvestment} />
