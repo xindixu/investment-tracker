@@ -91,6 +91,7 @@ export default function Page() {
   const [groupBasis, setGroupBasis] = useState<"all" | "taxable">("all");
   const [groupSortKey, setGroupSortKey] = useState<GroupSortKey | null>("value");
   const [groupSortDir, setGroupSortDir] = useState<SortDir>("desc");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const symbols = useMemo(
     () => Array.from(new Set(investments.map((i) => i.symbol.toUpperCase()))),
@@ -308,6 +309,10 @@ export default function Page() {
   const removeInvestment = (id: string) => {
     setInvestments(investments.filter((i) => i.id !== id));
   };
+  const updateQuantity = (id: string, quantity: number) => {
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    setInvestments(investments.map((i) => (i.id === id ? { ...i, quantity } : i)));
+  };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -442,25 +447,44 @@ export default function Page() {
                   <td colSpan={7} className="empty">No matches.</td>
                 </tr>
               ) : (
-                filteredRows.map(({ inv, account, value }) => (
-                  <tr key={inv.id}>
-                    <td>{inv.symbol}</td>
-                    <td>{account ? account.name : <span className="muted">unknown</span>}</td>
-                    <td className="num">{inv.quantity}</td>
-                    <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
-                    <td>
-                      <span className={inv.planned ? "badge badge-future" : "badge badge-current"}>
-                        {inv.planned ? "Future" : "Current"}
-                      </span>
-                    </td>
-                    <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
-                    <td>
-                      <button className="danger" onClick={() => removeInvestment(inv.id)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredRows.map(({ inv, account, value }) => {
+                  const isEditing = editingId === inv.id;
+                  return (
+                    <tr key={inv.id}>
+                      <td>{inv.symbol}</td>
+                      <td>{account ? account.name : <span className="muted">unknown</span>}</td>
+                      <td className="num">
+                        {isEditing ? (
+                          <QuantityInput
+                            value={inv.quantity}
+                            onCommit={(q) => {
+                              updateQuantity(inv.id, q);
+                              setEditingId(null);
+                            }}
+                            onCancel={() => setEditingId(null)}
+                          />
+                        ) : (
+                          inv.quantity
+                        )}
+                      </td>
+                      <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
+                      <td>
+                        <span className={inv.planned ? "badge badge-future" : "badge badge-current"}>
+                          {inv.planned ? "Future" : "Current"}
+                        </span>
+                      </td>
+                      <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
+                      <td>
+                        <button onClick={() => setEditingId(isEditing ? null : inv.id)}>
+                          {isEditing ? "Done" : "Edit"}
+                        </button>
+                        <button className="danger" onClick={() => removeInvestment(inv.id)}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
               <tr>
                 <td colSpan={5} style={{ fontWeight: 600 }}>
@@ -572,6 +596,54 @@ export default function Page() {
         )}
       </section>
     </main>
+  );
+}
+
+function QuantityInput({
+  value,
+  onCommit,
+  onCancel,
+}: {
+  value: number;
+  onCommit: (q: number) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const ref = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+
+  const commit = () => {
+    const q = Number(draft);
+    if (Number.isFinite(q) && q > 0 && q !== value) {
+      onCommit(q);
+    } else {
+      onCancel();
+    }
+  };
+
+  return (
+    <input
+      ref={ref}
+      type="number"
+      min="0"
+      step="any"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(String(value));
+          onCancel();
+        }
+      }}
+      style={{ width: 90, fontSize: 13, padding: "3px 6px", textAlign: "right" }}
+    />
   );
 }
 
