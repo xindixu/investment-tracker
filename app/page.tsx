@@ -26,9 +26,10 @@ const fmtPct = (n: number) =>
     maximumFractionDigits: 2,
   }) + "%";
 
-type HoldingSortKey = "symbol" | "account" | "quantity" | "type" | "value";
+type HoldingSortKey = "symbol" | "account" | "quantity" | "type" | "status" | "value";
 type GroupSortKey = "symbol" | "quantity" | "type" | "value" | "percent";
 type SortDir = "asc" | "desc";
+type StatusFilter = "" | "current" | "future";
 
 const compare = (a: string | number | undefined, b: string | number | undefined) => {
   if (a === b) return 0;
@@ -58,12 +59,14 @@ function parseBackup(data: unknown): { accounts: Account[]; investments: Investm
     if (typeof x.id !== "string" || typeof x.symbol !== "string") return null;
     if (typeof x.accountId !== "string" || typeof x.quantity !== "number") return null;
     if (!x.type || !INVESTMENT_TYPES.includes(x.type)) return null;
+    if (x.planned !== undefined && typeof x.planned !== "boolean") return null;
     investments.push({
       id: x.id,
       symbol: x.symbol,
       accountId: x.accountId,
       quantity: x.quantity,
       type: x.type,
+      planned: x.planned ?? false,
     });
   }
 
@@ -79,10 +82,12 @@ export default function Page() {
   const [symbolFilter, setSymbolFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<InvestmentType | "">("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [sortKey, setSortKey] = useState<HoldingSortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [groupSymbolFilter, setGroupSymbolFilter] = useState("");
   const [groupTypeFilter, setGroupTypeFilter] = useState<InvestmentType | "">("");
+  const [groupStatusFilter, setGroupStatusFilter] = useState<StatusFilter>("");
   const [groupBasis, setGroupBasis] = useState<"all" | "taxable">("all");
   const [groupSortKey, setGroupSortKey] = useState<GroupSortKey | null>("value");
   const [groupSortDir, setGroupSortDir] = useState<SortDir>("desc");
@@ -156,6 +161,10 @@ export default function Page() {
     if (typeFilter) {
       result = result.filter(({ inv }) => inv.type === typeFilter);
     }
+    if (statusFilter) {
+      const wantPlanned = statusFilter === "future";
+      result = result.filter(({ inv }) => Boolean(inv.planned) === wantPlanned);
+    }
     if (sortKey) {
       const dir = sortDir === "asc" ? 1 : -1;
       const keyFn = (r: (typeof rows)[number]): string | number | undefined => {
@@ -163,14 +172,16 @@ export default function Page() {
         if (sortKey === "account") return r.account?.name ?? "";
         if (sortKey === "quantity") return r.inv.quantity;
         if (sortKey === "type") return INVESTMENT_TYPE_LABELS[r.inv.type];
+        if (sortKey === "status") return r.inv.planned ? "Future" : "Current";
         return r.value;
       };
       result = [...result].sort((a, b) => dir * compare(keyFn(a), keyFn(b)));
     }
     return result;
-  }, [rows, symbolFilter, accountFilter, typeFilter, sortKey, sortDir]);
+  }, [rows, symbolFilter, accountFilter, typeFilter, statusFilter, sortKey, sortDir]);
 
-  const isFiltered = symbolFilter.trim() !== "" || accountFilter !== "" || typeFilter !== "";
+  const isFiltered =
+    symbolFilter.trim() !== "" || accountFilter !== "" || typeFilter !== "" || statusFilter !== "";
 
   const displayedTotal = useMemo(
     () => filteredRows.reduce((s, r) => s + (r.value ?? 0), 0),
@@ -196,6 +207,10 @@ export default function Page() {
     >();
     for (const inv of investments) {
       if (groupBasis === "taxable" && accountById[inv.accountId]?.type !== "taxable") continue;
+      if (groupStatusFilter) {
+        const wantPlanned = groupStatusFilter === "future";
+        if (Boolean(inv.planned) !== wantPlanned) continue;
+      }
       const key = inv.symbol.toUpperCase();
       const price = prices[key];
       const partial = typeof price === "number" ? price * inv.quantity : 0;
@@ -215,7 +230,7 @@ export default function Page() {
       }
     }
     return Array.from(map.values());
-  }, [investments, prices, groupBasis, accountById]);
+  }, [investments, prices, groupBasis, groupStatusFilter, accountById]);
 
   const groupedTotal = useMemo(
     () => grouped.reduce((s, g) => s + (g.hasPrice ? g.value : 0), 0),
@@ -274,12 +289,20 @@ export default function Page() {
     symbol: string,
     accountId: string,
     quantity: number,
-    type: InvestmentType
+    type: InvestmentType,
+    planned: boolean
   ) => {
     if (!symbol.trim() || !accountId || !(quantity > 0)) return;
     setInvestments([
       ...investments,
-      { id: newId(), symbol: symbol.trim().toUpperCase(), accountId, quantity, type },
+      {
+        id: newId(),
+        symbol: symbol.trim().toUpperCase(),
+        accountId,
+        quantity,
+        type,
+        planned,
+      },
     ]);
   };
   const removeInvestment = (id: string) => {
@@ -351,6 +374,7 @@ export default function Page() {
                 setSymbolFilter("");
                 setAccountFilter("");
                 setTypeFilter("");
+                setStatusFilter("");
               }}
             >
               Clear filters
@@ -397,6 +421,17 @@ export default function Page() {
                     ))}
                   </select>
                 </SortableTh>
+                <SortableTh label="Status" col="status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort}>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="">All</option>
+                    <option value="current">Current</option>
+                    <option value="future">Future</option>
+                  </select>
+                </SortableTh>
                 <SortableTh label="Value" col="value" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} numeric />
                 <th></th>
               </tr>
@@ -404,7 +439,7 @@ export default function Page() {
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="empty">No matches.</td>
+                  <td colSpan={7} className="empty">No matches.</td>
                 </tr>
               ) : (
                 filteredRows.map(({ inv, account, value }) => (
@@ -413,6 +448,11 @@ export default function Page() {
                     <td>{account ? account.name : <span className="muted">unknown</span>}</td>
                     <td className="num">{inv.quantity}</td>
                     <td>{INVESTMENT_TYPE_LABELS[inv.type]}</td>
+                    <td>
+                      <span className={inv.planned ? "badge badge-future" : "badge badge-current"}>
+                        {inv.planned ? "Future" : "Current"}
+                      </span>
+                    </td>
                     <td className="num">{value === undefined ? "—" : fmtMoney(value)}</td>
                     <td>
                       <button className="danger" onClick={() => removeInvestment(inv.id)}>
@@ -423,7 +463,7 @@ export default function Page() {
                 ))
               )}
               <tr>
-                <td colSpan={4} style={{ fontWeight: 600 }}>
+                <td colSpan={5} style={{ fontWeight: 600 }}>
                   {isFiltered ? "Filtered total" : "Total"}
                 </td>
                 <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(displayedTotal)}</td>
@@ -437,6 +477,17 @@ export default function Page() {
       <section>
         <div className="toolbar">
           <h2>By Symbol</h2>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#555" }}>
+            Show:
+            <select
+              value={groupStatusFilter}
+              onChange={(e) => setGroupStatusFilter(e.target.value as StatusFilter)}
+            >
+              <option value="">All</option>
+              <option value="current">Current</option>
+              <option value="future">Future</option>
+            </select>
+          </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#555" }}>
             % basis:
             <select
@@ -639,12 +690,19 @@ function AddInvestmentSection({
   onAdd,
 }: {
   accounts: Account[];
-  onAdd: (symbol: string, accountId: string, quantity: number, type: InvestmentType) => void;
+  onAdd: (
+    symbol: string,
+    accountId: string,
+    quantity: number,
+    type: InvestmentType,
+    planned: boolean
+  ) => void;
 }) {
   const [symbol, setSymbol] = useState("");
   const [accountId, setAccountId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [type, setType] = useState<InvestmentType>("ETF");
+  const [planned, setPlanned] = useState(false);
 
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
@@ -696,14 +754,26 @@ function AddInvestmentSection({
               ))}
             </select>
           </label>
+          <label className="field">
+            Status
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, paddingTop: 6 }}>
+              <input
+                type="checkbox"
+                checked={planned}
+                onChange={(e) => setPlanned(e.target.checked)}
+              />
+              Planning to buy
+            </label>
+          </label>
           <button
             className="primary"
             onClick={() => {
               const q = Number(quantity);
               if (!Number.isFinite(q) || q <= 0) return;
-              onAdd(symbol, accountId, q, type);
+              onAdd(symbol, accountId, q, type, planned);
               setSymbol("");
               setQuantity("");
+              setPlanned(false);
             }}
           >
             Add

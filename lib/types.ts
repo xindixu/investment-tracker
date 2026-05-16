@@ -29,4 +29,5 @@ export interface Investment {
   accountId: string;
   quantity: number;
   type: InvestmentType;
+  planned?: boolean;
 }
