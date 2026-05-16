@@ -83,6 +83,7 @@ export default function Page() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [groupSymbolFilter, setGroupSymbolFilter] = useState("");
   const [groupTypeFilter, setGroupTypeFilter] = useState<InvestmentType | "">("");
+  const [groupBasis, setGroupBasis] = useState<"all" | "taxable">("all");
   const [groupSortKey, setGroupSortKey] = useState<GroupSortKey | null>("value");
   const [groupSortDir, setGroupSortDir] = useState<SortDir>("desc");
 
@@ -194,6 +195,7 @@ export default function Page() {
       { symbol: string; quantity: number; type: InvestmentType; value: number; hasPrice: boolean }
     >();
     for (const inv of investments) {
+      if (groupBasis === "taxable" && accountById[inv.accountId]?.type !== "taxable") continue;
       const key = inv.symbol.toUpperCase();
       const price = prices[key];
       const partial = typeof price === "number" ? price * inv.quantity : 0;
@@ -213,7 +215,12 @@ export default function Page() {
       }
     }
     return Array.from(map.values());
-  }, [investments, prices]);
+  }, [investments, prices, groupBasis, accountById]);
+
+  const groupedTotal = useMemo(
+    () => grouped.reduce((s, g) => s + (g.hasPrice ? g.value : 0), 0),
+    [grouped]
+  );
 
   const filteredGrouped = useMemo(() => {
     const q = groupSymbolFilter.trim().toLowerCase();
@@ -234,6 +241,11 @@ export default function Page() {
   }, [grouped, groupSymbolFilter, groupTypeFilter, groupSortKey, groupSortDir]);
 
   const isGroupFiltered = groupSymbolFilter.trim() !== "" || groupTypeFilter !== "";
+
+  const displayedGroupTotal = useMemo(
+    () => filteredGrouped.reduce((s, g) => s + (g.hasPrice ? g.value : 0), 0),
+    [filteredGrouped]
+  );
 
   const toggleGroupSort = (key: GroupSortKey) => {
     if (groupSortKey !== key) {
@@ -425,6 +437,16 @@ export default function Page() {
       <section>
         <div className="toolbar">
           <h2>By Symbol</h2>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#555" }}>
+            % basis:
+            <select
+              value={groupBasis}
+              onChange={(e) => setGroupBasis(e.target.value as "all" | "taxable")}
+            >
+              <option value="all">All</option>
+              <option value="taxable">All taxable accounts</option>
+            </select>
+          </label>
           {isGroupFiltered && (
             <button
               onClick={() => {
@@ -480,11 +502,20 @@ export default function Page() {
                     <td>{INVESTMENT_TYPE_LABELS[g.type]}</td>
                     <td className="num">{g.hasPrice ? fmtMoney(g.value) : "—"}</td>
                     <td className="num">
-                      {totalValue > 0 && g.hasPrice ? fmtPct(g.value / totalValue) : "—"}
+                      {groupedTotal > 0 && g.hasPrice ? fmtPct(g.value / groupedTotal) : "—"}
                     </td>
                   </tr>
                 ))
               )}
+              <tr>
+                <td colSpan={3} style={{ fontWeight: 600 }}>
+                  {isGroupFiltered ? "Filtered total" : "Total"}
+                </td>
+                <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(displayedGroupTotal)}</td>
+                <td className="num" style={{ fontWeight: 600 }}>
+                  {groupedTotal > 0 ? fmtPct(displayedGroupTotal / groupedTotal) : "—"}
+                </td>
+              </tr>
             </tbody>
           </table>
         )}
