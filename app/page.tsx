@@ -27,6 +27,7 @@ const fmtPct = (n: number) =>
   }) + "%";
 
 type HoldingSortKey = "symbol" | "account" | "quantity" | "type" | "value";
+type GroupSortKey = "symbol" | "quantity" | "type" | "value" | "percent";
 type SortDir = "asc" | "desc";
 
 const compare = (a: string | number | undefined, b: string | number | undefined) => {
@@ -47,6 +48,10 @@ export default function Page() {
   const [typeFilter, setTypeFilter] = useState<InvestmentType | "">("");
   const [sortKey, setSortKey] = useState<HoldingSortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [groupSymbolFilter, setGroupSymbolFilter] = useState("");
+  const [groupTypeFilter, setGroupTypeFilter] = useState<InvestmentType | "">("");
+  const [groupSortKey, setGroupSortKey] = useState<GroupSortKey | null>("value");
+  const [groupSortDir, setGroupSortDir] = useState<SortDir>("desc");
 
   const symbols = useMemo(
     () => Array.from(new Set(investments.map((i) => i.symbol.toUpperCase()))),
@@ -174,8 +179,40 @@ export default function Page() {
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.value - a.value);
+    return Array.from(map.values());
   }, [investments, prices]);
+
+  const filteredGrouped = useMemo(() => {
+    const q = groupSymbolFilter.trim().toLowerCase();
+    let result = grouped;
+    if (q) result = result.filter((g) => g.symbol.toLowerCase().includes(q));
+    if (groupTypeFilter) result = result.filter((g) => g.type === groupTypeFilter);
+    if (groupSortKey) {
+      const dir = groupSortDir === "asc" ? 1 : -1;
+      const keyFn = (g: (typeof grouped)[number]): string | number | undefined => {
+        if (groupSortKey === "symbol") return g.symbol;
+        if (groupSortKey === "quantity") return g.quantity;
+        if (groupSortKey === "type") return INVESTMENT_TYPE_LABELS[g.type];
+        return g.value;
+      };
+      result = [...result].sort((a, b) => dir * compare(keyFn(a), keyFn(b)));
+    }
+    return result;
+  }, [grouped, groupSymbolFilter, groupTypeFilter, groupSortKey, groupSortDir]);
+
+  const isGroupFiltered = groupSymbolFilter.trim() !== "" || groupTypeFilter !== "";
+
+  const toggleGroupSort = (key: GroupSortKey) => {
+    if (groupSortKey !== key) {
+      setGroupSortKey(key);
+      setGroupSortDir("asc");
+    } else if (groupSortDir === "asc") {
+      setGroupSortDir("desc");
+    } else {
+      setGroupSortKey(null);
+      setGroupSortDir("asc");
+    }
+  };
 
   const addAccount = (name: string, type: AccountType) => {
     if (!name.trim()) return;
@@ -308,32 +345,68 @@ export default function Page() {
       </section>
 
       <section>
-        <h2>By Symbol</h2>
+        <div className="toolbar">
+          <h2>By Symbol</h2>
+          {isGroupFiltered && (
+            <button
+              onClick={() => {
+                setGroupSymbolFilter("");
+                setGroupTypeFilter("");
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
         {grouped.length === 0 ? (
           <div className="empty">No investments yet.</div>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th className="num">Quantity</th>
-                <th>Type</th>
-                <th className="num">Value</th>
-                <th className="num">% of Total</th>
+                <SortableTh label="Symbol" col="symbol" sortKey={groupSortKey} sortDir={groupSortDir} onClick={toggleGroupSort}>
+                  <input
+                    value={groupSymbolFilter}
+                    onChange={(e) => setGroupSymbolFilter(e.target.value)}
+                    placeholder="filter"
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  />
+                </SortableTh>
+                <SortableTh label="Quantity" col="quantity" sortKey={groupSortKey} sortDir={groupSortDir} onClick={toggleGroupSort} numeric />
+                <SortableTh label="Type" col="type" sortKey={groupSortKey} sortDir={groupSortDir} onClick={toggleGroupSort}>
+                  <select
+                    value={groupTypeFilter}
+                    onChange={(e) => setGroupTypeFilter(e.target.value as InvestmentType | "")}
+                    style={{ width: "100%", fontSize: 12, padding: "3px 6px" }}
+                  >
+                    <option value="">All</option>
+                    {INVESTMENT_TYPES.map((t) => (
+                      <option key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</option>
+                    ))}
+                  </select>
+                </SortableTh>
+                <SortableTh label="Value" col="value" sortKey={groupSortKey} sortDir={groupSortDir} onClick={toggleGroupSort} numeric />
+                <SortableTh label="% of Total" col="percent" sortKey={groupSortKey} sortDir={groupSortDir} onClick={toggleGroupSort} numeric />
               </tr>
             </thead>
             <tbody>
-              {grouped.map((g) => (
-                <tr key={g.symbol}>
-                  <td>{g.symbol}</td>
-                  <td className="num">{g.quantity}</td>
-                  <td>{INVESTMENT_TYPE_LABELS[g.type]}</td>
-                  <td className="num">{g.hasPrice ? fmtMoney(g.value) : "—"}</td>
-                  <td className="num">
-                    {totalValue > 0 && g.hasPrice ? fmtPct(g.value / totalValue) : "—"}
-                  </td>
+              {filteredGrouped.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty">No matches.</td>
                 </tr>
-              ))}
+              ) : (
+                filteredGrouped.map((g) => (
+                  <tr key={g.symbol}>
+                    <td>{g.symbol}</td>
+                    <td className="num">{g.quantity}</td>
+                    <td>{INVESTMENT_TYPE_LABELS[g.type]}</td>
+                    <td className="num">{g.hasPrice ? fmtMoney(g.value) : "—"}</td>
+                    <td className="num">
+                      {totalValue > 0 && g.hasPrice ? fmtPct(g.value / totalValue) : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}
@@ -342,7 +415,7 @@ export default function Page() {
   );
 }
 
-function SortableTh({
+function SortableTh<K extends string>({
   label,
   col,
   sortKey,
@@ -352,10 +425,10 @@ function SortableTh({
   children,
 }: {
   label: string;
-  col: HoldingSortKey;
-  sortKey: HoldingSortKey | null;
+  col: K;
+  sortKey: K | null;
   sortDir: SortDir;
-  onClick: (col: HoldingSortKey) => void;
+  onClick: (col: K) => void;
   numeric?: boolean;
   children?: React.ReactNode;
 }) {
