@@ -27,112 +27,120 @@
       "symbol": "VOO",
       "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
       "quantity": 147.436,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "5a5b9bf4-e8bc-4d26-8d17-616834a99e6e",
       "symbol": "VGT",
       "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
       "quantity": 976,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "b6b093c6-2c49-405a-bfa2-3c2d5982782c",
       "symbol": "VXUS",
       "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
       "quantity": 24.252,
-      "type": "ETF"
-    },
-    {
-      "id": "e0bb7ac7-1bb3-4bc9-9a6e-6225fe05acc9",
-      "symbol": "SCHD",
-      "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
-      "quantity": 600,
-      "type": "ETF"
-    },
-    {
-      "id": "3ed07c10-7952-4ecf-91b8-3e90d5446468",
-      "symbol": "SCHD",
-      "accountId": "9751c647-0fc0-4645-9750-b741a1b8f76e",
-      "quantity": 400,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "acfb41f6-44a0-4ded-aba9-a50d4ef162fb",
       "symbol": "VOO",
       "accountId": "9751c647-0fc0-4645-9750-b741a1b8f76e",
       "quantity": 3,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "70fefb88-aae0-4017-99e3-cb44522a04ac",
       "symbol": "FFIKX",
       "accountId": "6e610891-23f3-4f70-8eaf-a67e96f4f4ee",
       "quantity": 6732.865,
-      "type": "mutual_fund"
+      "type": "mutual_fund",
+      "planned": false
     },
     {
       "id": "b6bdee2d-0b66-431b-8287-eadadeb501c6",
       "symbol": "GOOGL",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 96.302,
-      "type": "stock"
+      "type": "stock",
+      "planned": false
     },
     {
       "id": "ca279f78-af56-467f-a099-571f9eedf737",
       "symbol": "TSLA",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 24,
-      "type": "stock"
+      "type": "stock",
+      "planned": false
     },
     {
       "id": "88eafb97-c11f-49c3-bd2a-8cfd05353f2a",
       "symbol": "AAPL",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 21.43,
-      "type": "stock"
+      "type": "stock",
+      "planned": false
     },
     {
       "id": "5ec4cdff-832b-4938-b2db-de22e13f60a5",
       "symbol": "TSM",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 8.55,
-      "type": "stock"
+      "type": "stock",
+      "planned": false
     },
     {
       "id": "466f28c9-141c-44ca-bb51-d781b5c3a1b9",
       "symbol": "VGT",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 33.03,
-      "type": "ETF"
-    },
-    {
-      "id": "236a5b20-f6a9-4eeb-a12f-5497c7afa64c",
-      "symbol": "VUG",
-      "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
-      "quantity": 37.02,
-      "type": "ETF"
-    },
-    {
-      "id": "28322430-ae6d-4308-952e-ea72af256830",
-      "symbol": "SPY",
-      "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
-      "quantity": 3.21,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "56872978-380d-4e2f-b8d5-e20b7cfc1e58",
       "symbol": "VOO",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 1.57,
-      "type": "ETF"
+      "type": "ETF",
+      "planned": false
     },
     {
       "id": "394674e4-e2c5-47fa-b310-987e903cd04c",
       "symbol": "AMZN",
       "accountId": "ecd9dd84-a23b-446c-b4a2-ce4c865ba295",
       "quantity": 4,
-      "type": "stock"
+      "type": "stock",
+      "planned": false
+    },
+    {
+      "id": "c081116c-e343-4a2b-bf1a-4e14de30cf1e",
+      "symbol": "VOO",
+      "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
+      "quantity": 220,
+      "type": "ETF",
+      "planned": true
+    },
+    {
+      "id": "6c915c87-c110-4975-bd30-9877d4b11e21",
+      "symbol": "VXUS",
+      "accountId": "3c1cebca-69ca-4e83-9a99-2a1e105d3dd8",
+      "quantity": 1000,
+      "type": "ETF",
+      "planned": true
+    },
+    {
+      "id": "8c83b815-658f-4aad-adf6-8fc4e532a73b",
+      "symbol": "VGT",
+      "accountId": "9751c647-0fc0-4645-9750-b741a1b8f76e",
+      "quantity": 220,
+      "type": "ETF",
+      "planned": true
     }
   ]
 }

@@ -34,6 +34,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: #1a73e8; color: white; border-color: #1a73e8; }
 button.danger { background: transparent; border-color: transparent; color: #b00020; padding: 4px 8px; font-size: 12px; }
 button.danger:hover { background: #fce8eb; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
 th { font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; letter-spacing: 0.04em; }

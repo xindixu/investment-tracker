@@ -393,6 +393,7 @@ export default function Page() {
         {rows.length === 0 ? (
           <div className="empty">No investments yet.</div>
         ) : (
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -498,6 +499,7 @@ export default function Page() {
               </tr>
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -539,6 +541,7 @@ export default function Page() {
         {grouped.length === 0 ? (
           <div className="empty">No investments yet.</div>
         ) : (
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -596,6 +599,7 @@ export default function Page() {
               </tr>
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </main>
@@ -735,7 +739,8 @@ function AccountsSection({
       {accounts.length === 0 ? (
         <div className="empty">No accounts yet.</div>
       ) : (
-        <table style={{ marginTop: 12 }}>
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+        <table>
           <thead>
             <tr>
               <th>Name</th>
@@ -755,6 +760,7 @@ function AccountsSection({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   );
