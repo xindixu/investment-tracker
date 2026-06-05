@@ -338,6 +338,10 @@ export default function Page() {
   const removeCash = (id: string) => {
     setCash(cash.filter((c) => c.id !== id));
   };
+  const updateCash = (id: string, amount: number) => {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setCash(cash.map((c) => (c.id === id ? { ...c, amount } : c)));
+  };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -396,7 +400,7 @@ export default function Page() {
 
       <AccountsSection accounts={accounts} onAdd={addAccount} onRemove={removeAccount} />
       <AddInvestmentSection accounts={accounts} onAdd={addInvestment} />
-      <CashSection cash={cash} onAdd={addCash} onRemove={removeCash} />
+      <CashSection cash={cash} onAdd={addCash} onRemove={removeCash} onUpdate={updateCash} />
 
       <section>
         <div className="toolbar">
@@ -798,14 +802,17 @@ function CashSection({
   cash,
   onAdd,
   onRemove,
+  onUpdate,
 }: {
   cash: CashEntry[];
   onAdd: (label: string, amount: number, planned: boolean) => void;
   onRemove: (id: string) => void;
+  onUpdate: (id: string, amount: number) => void;
 }) {
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [planned, setPlanned] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const currentTotal = cash.reduce((s, c) => (c.planned ? s : s + c.amount), 0);
   const futureTotal = cash.reduce((s, c) => (c.planned ? s + c.amount : s), 0);
@@ -872,20 +879,39 @@ function CashSection({
               </tr>
             </thead>
             <tbody>
-              {cash.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.label || <span className="muted">unlabeled</span>}</td>
-                  <td>
-                    <span className={c.planned ? "badge badge-future" : "badge badge-current"}>
-                      {c.planned ? "Future" : "Current"}
-                    </span>
-                  </td>
-                  <td className="num">{fmtMoney(c.amount)}</td>
-                  <td>
-                    <button className="danger" onClick={() => onRemove(c.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
+              {cash.map((c) => {
+                const isEditing = editingId === c.id;
+                return (
+                  <tr key={c.id}>
+                    <td>{c.label || <span className="muted">unlabeled</span>}</td>
+                    <td>
+                      <span className={c.planned ? "badge badge-future" : "badge badge-current"}>
+                        {c.planned ? "Future" : "Current"}
+                      </span>
+                    </td>
+                    <td className="num">
+                      {isEditing ? (
+                        <QuantityInput
+                          value={c.amount}
+                          onCommit={(a) => {
+                            onUpdate(c.id, a);
+                            setEditingId(null);
+                          }}
+                          onCancel={() => setEditingId(null)}
+                        />
+                      ) : (
+                        fmtMoney(c.amount)
+                      )}
+                    </td>
+                    <td>
+                      <button onClick={() => setEditingId(isEditing ? null : c.id)}>
+                        {isEditing ? "Done" : "Edit"}
+                      </button>
+                      <button className="danger" onClick={() => onRemove(c.id)}>Delete</button>
+                    </td>
+                  </tr>
+                );
+              })}
               <tr>
                 <td colSpan={2} style={{ fontWeight: 600 }}>Current cash</td>
                 <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(currentTotal)}</td>
