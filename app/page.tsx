@@ -6,6 +6,7 @@ import {
   AccountType,
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_LABELS,
+  CashEntry,
   Investment,
   InvestmentType,
   INVESTMENT_TYPES,
@@ -38,9 +39,11 @@ const compare = (a: string | number | undefined, b: string | number | undefined)
   return a < b ? -1 : 1;
 };
 
-function parseBackup(data: unknown): { accounts: Account[]; investments: Investment[] } | null {
+function parseBackup(
+  data: unknown
+): { accounts: Account[]; investments: Investment[]; cash: CashEntry[] } | null {
   if (!data || typeof data !== "object") return null;
-  const d = data as { accounts?: unknown; investments?: unknown };
+  const d = data as { accounts?: unknown; investments?: unknown; cash?: unknown };
   if (!Array.isArray(d.accounts) || !Array.isArray(d.investments)) return null;
 
   const accounts: Account[] = [];
@@ -70,12 +73,26 @@ function parseBackup(data: unknown): { accounts: Account[]; investments: Investm
     });
   }
 
-  return { accounts, investments };
+  const cash: CashEntry[] = [];
+  if (d.cash !== undefined) {
+    if (!Array.isArray(d.cash)) return null;
+    for (const c of d.cash) {
+      if (!c || typeof c !== "object") return null;
+      const x = c as Partial<CashEntry>;
+      if (typeof x.id !== "string" || typeof x.label !== "string") return null;
+      if (typeof x.amount !== "number") return null;
+      if (x.planned !== undefined && typeof x.planned !== "boolean") return null;
+      cash.push({ id: x.id, label: x.label, amount: x.amount, planned: x.planned ?? false });
+    }
+  }
+
+  return { accounts, investments, cash };
 }
 
 export default function Page() {
   const [accounts, setAccounts] = useLocalStorage<Account[]>("accounts", []);
   const [investments, setInvestments] = useLocalStorage<Investment[]>("investments", []);
+  const [cash, setCash] = useLocalStorage<CashEntry[]>("cash", []);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
@@ -314,12 +331,21 @@ export default function Page() {
     setInvestments(investments.map((i) => (i.id === id ? { ...i, quantity } : i)));
   };
 
+  const addCash = (label: string, amount: number, planned: boolean) => {
+    if (!(amount > 0)) return;
+    setCash([...cash, { id: newId(), label: label.trim(), amount, planned }]);
+  };
+  const removeCash = (id: string) => {
+    setCash(cash.filter((c) => c.id !== id));
+  };
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleExport = () => {
     const payload = {
       accounts,
       investments: investments.map((i) => ({ ...i, planned: i.planned ?? false })),
+      cash: cash.map((c) => ({ ...c, planned: c.planned ?? false })),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -338,10 +364,11 @@ export default function Page() {
         alert("Invalid backup file: expected { accounts: [...], investments: [...] } matching the data model.");
         return;
       }
-      const hasData = accounts.length > 0 || investments.length > 0;
-      if (hasData && !confirm("This will replace your current accounts and investments. Continue?")) return;
+      const hasData = accounts.length > 0 || investments.length > 0 || cash.length > 0;
+      if (hasData && !confirm("This will replace your current accounts, investments, and cash. Continue?")) return;
       setAccounts(parsed.accounts);
       setInvestments(parsed.investments);
+      setCash(parsed.cash);
     } catch (e) {
       alert("Failed to import: " + (e instanceof Error ? e.message : "unknown error"));
     }
@@ -369,6 +396,7 @@ export default function Page() {
 
       <AccountsSection accounts={accounts} onAdd={addAccount} onRemove={removeAccount} />
       <AddInvestmentSection accounts={accounts} onAdd={addInvestment} />
+      <CashSection cash={cash} onAdd={addCash} onRemove={removeCash} />
 
       <section>
         <div className="toolbar">
@@ -760,6 +788,116 @@ function AccountsSection({
             ))}
           </tbody>
         </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CashSection({
+  cash,
+  onAdd,
+  onRemove,
+}: {
+  cash: CashEntry[];
+  onAdd: (label: string, amount: number, planned: boolean) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [amount, setAmount] = useState("");
+  const [planned, setPlanned] = useState(false);
+
+  const currentTotal = cash.reduce((s, c) => (c.planned ? s : s + c.amount), 0);
+  const futureTotal = cash.reduce((s, c) => (c.planned ? s + c.amount : s), 0);
+
+  return (
+    <section>
+      <h2>Cash</h2>
+      <div className="row">
+        <label className="field">
+          Label
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Checking account"
+          />
+        </label>
+        <label className="field">
+          Amount
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="5000"
+          />
+        </label>
+        <label className="field">
+          Status
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, paddingTop: 6 }}>
+            <input
+              type="checkbox"
+              checked={planned}
+              onChange={(e) => setPlanned(e.target.checked)}
+            />
+            Expected in future
+          </label>
+        </label>
+        <button
+          className="primary"
+          onClick={() => {
+            const a = Number(amount);
+            if (!Number.isFinite(a) || a <= 0) return;
+            onAdd(label, a, planned);
+            setLabel("");
+            setAmount("");
+            setPlanned(false);
+          }}
+        >
+          Add cash
+        </button>
+      </div>
+      {cash.length === 0 ? (
+        <div className="empty">No cash entries yet.</div>
+      ) : (
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Status</th>
+                <th className="num">Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cash.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.label || <span className="muted">unlabeled</span>}</td>
+                  <td>
+                    <span className={c.planned ? "badge badge-future" : "badge badge-current"}>
+                      {c.planned ? "Future" : "Current"}
+                    </span>
+                  </td>
+                  <td className="num">{fmtMoney(c.amount)}</td>
+                  <td>
+                    <button className="danger" onClick={() => onRemove(c.id)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan={2} style={{ fontWeight: 600 }}>Current cash</td>
+                <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(currentTotal)}</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td colSpan={2} style={{ fontWeight: 600 }}>Future cash</td>
+                <td className="num" style={{ fontWeight: 600 }}>{fmtMoney(futureTotal)}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </section>
