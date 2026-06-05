@@ -31,3 +31,10 @@ export interface Investment {
   type: InvestmentType;
   planned?: boolean;
 }
+
+export interface CashEntry {
+  id: string;
+  label: string;
+  amount: number;
+  planned?: boolean;
+}
